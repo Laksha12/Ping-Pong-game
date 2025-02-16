@@ -1,0 +1,312 @@
+import pygame
+import sys
+
+# Initialize Pygame
+pygame.init()
+
+# Screen dimensions
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+BLUE = (0, 0, 255)  # Blue color for the ball when moving
+RED = (255, 0, 0)  # Red color for the ball when not moving
+GRAY = (200, 200, 200)  # Gray color for buttons
+LIGHT_GRAY = (220, 220, 220)  # Light gray for button hover effect
+
+# Screen setup
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Ping Pong")
+
+# Clock
+clock = pygame.time.Clock()
+
+# Paddle settings
+PADDLE_WIDTH = 10
+PADDLE_HEIGHT = 100
+PADDLE_SPEED = 10
+
+# Ball settings
+BALL_SIZE = 15
+BALL_SPEED_X = 3  # Reduced speed
+BALL_SPEED_Y = 3  # Reduced speed
+ball_moving = False
+
+# Paddle positions
+paddle1_y = (SCREEN_HEIGHT // 2) - (PADDLE_HEIGHT // 2)
+paddle2_y = (SCREEN_HEIGHT // 2) - (PADDLE_HEIGHT // 2)
+
+# Ball position
+ball_x = SCREEN_WIDTH // 2
+ball_y = SCREEN_HEIGHT // 2
+
+# Scores
+score1 = 0
+score2 = 0
+
+# Player names
+player1_name = "Player 1"
+player2_name = "Player 2"
+
+# Font for scoring, names, and menu
+font = pygame.font.Font(None, 74)
+name_font = pygame.font.Font(None, 36)
+menu_font = pygame.font.Font(None, 50)
+
+# States
+STATE_HOME = 0
+STATE_GAME = 1
+STATE_GAME_OVER = 2
+state = STATE_HOME
+
+# Button properties
+button_width = 200
+button_height = 60
+button_radius = 10
+
+# Score limit
+SCORE_LIMIT = 5
+
+
+def reset_game():
+    global paddle1_y, paddle2_y, ball_x, ball_y, score1, score2, ball_moving
+    global BALL_SPEED_X, BALL_SPEED_Y
+
+    paddle1_y = (SCREEN_HEIGHT // 2) - (PADDLE_HEIGHT // 2)
+    paddle2_y = (SCREEN_HEIGHT // 2) - (PADDLE_HEIGHT // 2)
+    ball_x = SCREEN_WIDTH // 2
+    ball_y = SCREEN_HEIGHT // 2
+    score1 = 0
+    score2 = 0
+    ball_moving = False
+
+
+def draw_home_screen():
+    screen.fill(BLACK)
+
+    # Background gradient (top to bottom)
+    for y in range(0, SCREEN_HEIGHT):
+        # Calculate the gradient color, clamping values to be within the valid range
+        r = min(50 + int(0.5 * y), 255)
+        g = min(50 + int(0.5 * y), 255)
+        b = min(50 + int(0.5 * y), 255)
+        gradient_color = (r, g, b)
+        pygame.draw.line(screen, gradient_color, (0, y), (SCREEN_WIDTH, y))
+
+    # Draw "Start Game" button
+    start_button = pygame.Rect((SCREEN_WIDTH // 2 - button_width // 2, SCREEN_HEIGHT // 2 - button_height // 2 - 70),
+                               (button_width, button_height))
+    pygame.draw.rect(screen, GRAY, start_button, border_radius=button_radius)
+    pygame.draw.rect(screen, WHITE, start_button, 2, border_radius=button_radius)  # Button border
+    start_text = menu_font.render("Start Game", True, BLACK)
+    screen.blit(start_text, (
+        SCREEN_WIDTH // 2 - start_text.get_width() // 2, SCREEN_HEIGHT // 2 - start_text.get_height() // 2 - 70))
+
+    # Draw "Quit" button
+    quit_button = pygame.Rect((SCREEN_WIDTH // 2 - button_width // 2, SCREEN_HEIGHT // 2 - button_height // 2 + 10),
+                              (button_width, button_height))
+    pygame.draw.rect(screen, GRAY, quit_button, border_radius=button_radius)
+    pygame.draw.rect(screen, WHITE, quit_button, 2, border_radius=button_radius)  # Button border
+    quit_text = menu_font.render("Quit", True, BLACK)
+    screen.blit(quit_text,
+                (SCREEN_WIDTH // 2 - quit_text.get_width() // 2, SCREEN_HEIGHT // 2 - quit_text.get_height() // 2 + 10))
+
+    # Draw title
+    title_text = font.render("Ping Pong Game", True, WHITE)
+    screen.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 50))
+
+    pygame.display.flip()
+
+
+def handle_home_input(event):
+    if event.type == pygame.MOUSEBUTTONDOWN:
+        mouse_x, mouse_y = event.pos
+        # Check if "Start Game" button is clicked
+        if (SCREEN_WIDTH // 2 - button_width // 2 <= mouse_x <= SCREEN_WIDTH // 2 + button_width // 2 and
+                SCREEN_HEIGHT // 2 - button_height // 2 - 70 <= mouse_y <= SCREEN_HEIGHT // 2 - button_height // 2 - 70 + button_height):
+            return STATE_GAME
+        # Check if "Quit" button is clicked
+        elif (SCREEN_WIDTH // 2 - button_width // 2 <= mouse_x <= SCREEN_WIDTH // 2 + button_width // 2 and
+              SCREEN_HEIGHT // 2 - button_height // 2 + 10 <= mouse_y <= SCREEN_HEIGHT // 2 - button_height // 2 + 10 + button_height):
+            pygame.quit()
+            sys.exit()
+    return STATE_HOME
+
+
+def game_loop():
+    global paddle1_y, paddle2_y, ball_x, ball_y, score1, score2, ball_moving
+    global BALL_SPEED_X, BALL_SPEED_Y
+
+    while state == STATE_GAME:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left mouse button resumes the ball movement
+                    ball_moving = True
+                if event.button == 3:  # Right mouse button exits the game
+                    pygame.quit()
+                    sys.exit()
+
+        # Paddle movement
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_w] and paddle1_y > 0:
+            paddle1_y -= PADDLE_SPEED
+        if keys[pygame.K_s] and paddle1_y < SCREEN_HEIGHT - PADDLE_HEIGHT:
+            paddle1_y += PADDLE_SPEED
+        if keys[pygame.K_UP] and paddle2_y > 0:
+            paddle2_y -= PADDLE_SPEED
+        if keys[pygame.K_DOWN] and paddle2_y < SCREEN_HEIGHT - PADDLE_HEIGHT:
+            paddle2_y += PADDLE_SPEED
+
+        # Ball movement
+        if ball_moving:
+            ball_x += BALL_SPEED_X
+            ball_y += BALL_SPEED_Y
+
+         # Ball collision with top and bottom
+        if ball_y <= 0 or ball_y >= SCREEN_HEIGHT - BALL_SIZE:
+            BALL_SPEED_Y *= -1
+
+        # Ball collision with paddles
+        if ball_x <= PADDLE_WIDTH and paddle1_y < ball_y < paddle1_y + PADDLE_HEIGHT:
+            BALL_SPEED_X *= -1
+        if ball_x >= SCREEN_WIDTH - PADDLE_WIDTH - BALL_SIZE and paddle2_y < ball_y < paddle2_y + PADDLE_HEIGHT:
+            BALL_SPEED_X *= -1
+
+        # Ball out of bounds (left or right)
+        if ball_x <= 0:
+            score2 += 1  # Player 2 scores
+            ball_moving = False  # Stop the ball
+            ball_x = SCREEN_WIDTH // 2
+            ball_y = SCREEN_HEIGHT // 2
+        if ball_x >= SCREEN_WIDTH - BALL_SIZE:
+            score1 += 1  # Player 1 scores
+            ball_moving = False  # Stop the ball
+            ball_x = SCREEN_WIDTH // 2
+            ball_y = SCREEN_HEIGHT // 2
+
+        # Check if any player has reached the score limit
+        if score1 >= SCORE_LIMIT or score2 >= SCORE_LIMIT:
+            return STATE_GAME_OVER
+
+         # Ball collision with top and bottom
+        if ball_y <= 0 or ball_y >= SCREEN_HEIGHT - BALL_SIZE:
+            BALL_SPEED_Y *= -1
+
+        # Ball collision with paddles
+        if ball_x <= PADDLE_WIDTH and paddle1_y < ball_y < paddle1_y + PADDLE_HEIGHT:
+            BALL_SPEED_X *= -1
+        if ball_x >= SCREEN_WIDTH - PADDLE_WIDTH - BALL_SIZE and paddle2_y < ball_y < paddle2_y + PADDLE_HEIGHT:
+            BALL_SPEED_X *= -1
+
+        # Ball out of bounds (left or right)
+        if ball_x <= 0:
+            score2 += 1  # Player 2 scores
+            ball_moving = False  # Stop the ball
+            ball_x = SCREEN_WIDTH // 2
+            ball_y = SCREEN_HEIGHT // 2
+        if ball_x >= SCREEN_WIDTH - BALL_SIZE:
+            score1 += 1  # Player 1 scores
+            ball_moving = False  # Stop the ball
+            ball_x = SCREEN_WIDTH // 2
+            ball_y = SCREEN_HEIGHT // 2
+
+        # Check if any player has reached the score limit
+        if score1 >= SCORE_LIMIT or score2 >= SCORE_LIMIT:
+            return STATE_GAME_OVER
+        
+          # Drawing
+        screen.fill(BLACK)
+        pygame.draw.rect(screen, WHITE, (0, paddle1_y, PADDLE_WIDTH, PADDLE_HEIGHT))
+        pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH - PADDLE_WIDTH, paddle2_y, PADDLE_WIDTH, PADDLE_HEIGHT))
+
+        # Change ball color based on its movement state
+        ball_color = BLUE if ball_moving else RED
+        pygame.draw.ellipse(screen, ball_color, (ball_x, ball_y, BALL_SIZE, BALL_SIZE))
+
+        pygame.draw.aaline(screen, WHITE, (SCREEN_WIDTH // 2, 0), (SCREEN_WIDTH // 2, SCREEN_HEIGHT))
+
+        # Draw player names
+        name_text1 = name_font.render(player1_name, True, WHITE)
+        name_text2 = name_font.render(player2_name, True, WHITE)
+        screen.blit(name_text1, (SCREEN_WIDTH // 4 - name_text1.get_width() // 2, 20))
+        screen.blit(name_text2, (3 * SCREEN_WIDTH // 4 - name_text2.get_width() // 2, 20))
+
+        # Draw scores
+        score_text1 = font.render(str(score1), True, WHITE)
+        screen.blit(score_text1, (SCREEN_WIDTH // 4 - score_text1.get_width() // 2, 60))
+        score_text2 = font.render(str(score2), True, WHITE)
+        screen.blit(score_text2, (3 * SCREEN_WIDTH // 4 - score_text2.get_width() // 2, 60))
+
+        pygame.display.flip()
+        clock.tick(60)  # Frame rate
+
+
+def draw_game_over_screen(winner_name):
+    screen.fill(BLACK)
+    game_over_text = font.render("Game Over", True, WHITE)
+    winner_text = font.render(f"{winner_name} Wins!", True, WHITE)
+    score_text = font.render(f"Score: {score1} - {score2}", True, WHITE)
+
+    screen.blit(game_over_text, (
+        SCREEN_WIDTH // 2 - game_over_text.get_width() // 2, SCREEN_HEIGHT // 2 - game_over_text.get_height() - 50))
+    screen.blit(winner_text, (SCREEN_WIDTH // 2 - winner_text.get_width() // 2, SCREEN_HEIGHT // 2))
+    screen.blit(score_text, (SCREEN_WIDTH // 2 - score_text.get_width() // 2, SCREEN_HEIGHT // 2 + 50))
+
+ # Draw "Restart" button
+    restart_button = pygame.Rect((SCREEN_WIDTH // 2 - button_width // 2, SCREEN_HEIGHT // 2 + 120),
+                                 (button_width, button_height))
+    pygame.draw.rect(screen, GRAY, restart_button, border_radius=button_radius)
+    pygame.draw.rect(screen, WHITE, restart_button, 2, border_radius=button_radius)  # Button border
+    restart_text = menu_font.render("Restart", True, BLACK)
+    screen.blit(restart_text, (
+        SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 120 + button_height // 4))
+
+    # Draw "Quit" button
+    quit_button = pygame.Rect((SCREEN_WIDTH // 2 - button_width // 2, SCREEN_HEIGHT // 2 + 190),
+                              (button_width, button_height))
+    pygame.draw.rect(screen, GRAY, quit_button, border_radius=button_radius)
+    pygame.draw.rect(screen, WHITE, quit_button, 2, border_radius=button_radius)  # Button border
+    quit_text = menu_font.render("Quit", True, BLACK)
+    screen.blit(quit_text, (
+        SCREEN_WIDTH // 2 - quit_text.get_width() // 2, SCREEN_HEIGHT // 2 + 190 + button_height // 4))
+
+    pygame.display.flip()
+
+ # Handle user input for restarting or quitting
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                # Check if "Restart" button is clicked
+                if (SCREEN_WIDTH // 2 - button_width // 2 <= mouse_x <= SCREEN_WIDTH // 2 + button_width // 2 and
+                        SCREEN_HEIGHT // 2 + 120 <= mouse_y <= SCREEN_HEIGHT // 2 + 120 + button_height):
+                    reset_game()
+                    return STATE_GAME
+                # Check if "Quit" button is clicked
+                elif (SCREEN_WIDTH // 2 - button_width // 2 <= mouse_x <= SCREEN_WIDTH // 2 + button_width // 2 and
+                      SCREEN_HEIGHT // 2 + 190 <= mouse_y <= SCREEN_HEIGHT // 2 + 190 + button_height):
+                    pygame.quit()
+                    sys.exit()
+
+# Main loop
+while True:
+    if state == STATE_HOME:
+        draw_home_screen()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            state = handle_home_input(event)
+    elif state == STATE_GAME:
+        state = game_loop()
+    elif state == STATE_GAME_OVER:
+        winner_name = player1_name if score1 >= SCORE_LIMIT else player2_name
+        state = draw_game_over_screen(winner_name)
